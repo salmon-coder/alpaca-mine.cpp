@@ -791,10 +791,8 @@ const char * llama_print_system_info(void) {
     return s.c_str();
 }
 
-int main(int argc, char ** argv) {
-    ggml_time_init();
-    const int64_t t_main_start_us = ggml_time_us();
 
+gpt_params initialize_params(int argc, char ** argv) {
     gpt_params params;
 
     params.temp = 0.1f;
@@ -804,9 +802,10 @@ int main(int argc, char ** argv) {
     params.interactive_start = true;
     params.use_color = true;
     params.model = "ggml-alpaca-7b-q4.bin";
+    params.seed = time(NULL);
 
     if (gpt_params_parse(argc, argv, params) == false) {
-        return 1;
+        exit(1);
     }
 
     if (params.seed < 0) {
@@ -815,13 +814,17 @@ int main(int argc, char ** argv) {
 
     fprintf(stderr, "%s: seed = %d\n", __func__, params.seed);
 
-    std::mt19937 rng(params.seed);
-    // if (params.prompt.empty()) {
-    //     params.prompt = gpt_random_prompt(rng);
-    // }
+    return params;
+}
 
-//    params.prompt = R"(// this function checks if the number n is prime
-//bool is_prime(int n) {)";
+
+int main(int argc, char ** argv) {
+    ggml_time_init();
+    const int64_t t_main_start_us = ggml_time_us();
+
+    gpt_params params = initialize_params(argc,argv);
+    std::mt19937 rng(params.seed);
+
 
     int64_t t_load_us = 0;
 
@@ -995,7 +998,7 @@ int main(int argc, char ** argv) {
             // some user input remains from prompt or interaction, forward it to processing
             while (embd_inp.size() > input_consumed) {
                 // fprintf(stderr, "%6d -> '%s'\n", embd_inp[input_consumed], vocab.id_to_token.at(embd_inp[input_consumed]).c_str());
-
+ 
                 embd.push_back(embd_inp[input_consumed]);
                 last_n_tokens.erase(last_n_tokens.begin());
                 last_n_tokens.push_back(embd_inp[input_consumed]);
