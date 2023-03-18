@@ -1007,9 +1007,12 @@ int main(int argc, char ** argv) {
     if (params.use_color) {
         printf(ANSI_COLOR_YELLOW);
     }
-
+    std::vector<gpt_vocab::id> input_history = embd_inp;
+    std::vector<gpt_vocab::id> output_history = embd;    
     while (remaining_tokens > 0) {
-        // predict
+
+
+      // predict
         if (embd.size() > 0) {
             const int64_t t_start_us = ggml_time_us();
 
@@ -1037,6 +1040,9 @@ int main(int argc, char ** argv) {
             // add it to the context
             embd.push_back(id);
 
+            // update output_history
+            output_history.push_back(id);
+            
             // echo this to console
             input_noecho = false;
 
@@ -1076,9 +1082,27 @@ int main(int argc, char ** argv) {
             process_interactive_mode(vocab,params,embd_inp,input_consumed,remaining_tokens);
         }
 
+
+
         // end of text token
         if (embd.back() == 2) {
-            // fprintf(stderr, " [end of text]\n");
+
+                  std::ofstream input_file("input_history.txt");
+for (auto id : input_history) {
+    input_file << vocab.id_to_token[id];
+}
+ input_file << '\n';
+
+
+
+for (auto id : output_history) {
+    input_file << vocab.id_to_token[id];
+}
+ input_file << '\n';
+ input_file.close();
+
+
+          
             is_interacting = true;
             continue;
         }
