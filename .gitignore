@@ -34,3 +34,4 @@ Release/
 CMakeFiles/
 CMakeCache.txt
 *.dir/
+.#chat.cpp
