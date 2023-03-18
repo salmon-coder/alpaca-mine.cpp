@@ -791,7 +791,6 @@ const char * llama_print_system_info(void) {
     return s.c_str();
 }
 
-
 gpt_params initialize_params(int argc, char ** argv) {
     gpt_params params;
 
@@ -829,6 +828,54 @@ gpt_vocab::id predict_next_token(llama_model& model, gpt_vocab& vocab, std::vect
 }
 
 const std::string INSTRUCTION_STRING = " Below is an instruction that describes a task. Write a response that appropriately completes the request.\n\n";
+
+
+// Interactive mode processing function
+void process_interactive_mode(gpt_vocab &vocab, gpt_params &params, std::vector<gpt_vocab::id> &embd_inp, int &input_consumed, int &remaining_tokens) {
+    if (is_interacting) {
+        std::vector<gpt_vocab::id> prompt_inp = ::llama_tokenize(vocab, "### Instruction:\n\n", true);
+        std::vector<gpt_vocab::id> response_inp = ::llama_tokenize(vocab, "### Response:\n\n", false);
+
+        input_consumed = embd_inp.size();
+        embd_inp.insert(embd_inp.end(), prompt_inp.begin(), prompt_inp.end());
+
+        printf("\n> ");
+
+        // currently being interactive
+        bool another_line = true;
+        while (another_line) {
+            fflush(stdout);
+            char buf[256] = {0};
+            int n_read;
+            if (params.use_color) printf(ANSI_BOLD ANSI_COLOR_GREEN);
+            if (scanf("%255[^\n]%n%*c", buf, &n_read) <= 0) {
+                // presumable empty line, consume the newline
+                if (scanf("%*c") <= 0) { /*ignore*/ }
+                n_read = 0;
+            }
+            if (params.use_color) printf(ANSI_COLOR_RESET);
+
+            if (n_read > 0 && buf[n_read - 1] == '\\') {
+                another_line = true;
+                buf[n_read - 1] = '\n';
+                buf[n_read] = 0;
+            } else {
+                another_line = false;
+                buf[n_read] = '\n';
+                buf[n_read + 1] = 0;
+            }
+
+            std::vector<gpt_vocab::id> line_inp = ::llama_tokenize(vocab, buf, false);
+            embd_inp.insert(embd_inp.end(), line_inp.begin(), line_inp.end());
+            embd_inp.insert(embd_inp.end(), response_inp.begin(), response_inp.end());
+
+            remaining_tokens -= prompt_inp.size() + line_inp.size() + response_inp.size();
+        }
+
+        is_interacting = false;
+    }
+}
+
 
 int main(int argc, char ** argv) {
     ggml_time_init();
@@ -1008,55 +1055,7 @@ int main(int argc, char ** argv) {
         // in interactive mode, and not currently processing queued inputs;
         // check if we should prompt the user for more
         if (params.interactive && embd_inp.size() <= input_consumed) {
-            // check for reverse prompt
-            // if (antiprompt_inp.size() && std::equal(antiprompt_inp.rbegin(), antiprompt_inp.rend(), last_n_tokens.rbegin())) {
-            //     // reverse prompt found
-            //     is_interacting = true;
-            // }
-            if (is_interacting) {
-                // input_consumed =  0;
-                // embd_inp.erase(embd_inp.begin());
-                input_consumed = embd_inp.size();
-                embd_inp.insert(embd_inp.end(), prompt_inp.begin(), prompt_inp.end());
-                
-
-                printf("\n> ");
-
-                // currently being interactive
-                bool another_line=true;
-                while (another_line) {
-                    fflush(stdout);
-                    char buf[256] = {0};
-                    int n_read;
-                    if(params.use_color) printf(ANSI_BOLD ANSI_COLOR_GREEN);
-                    if (scanf("%255[^\n]%n%*c", buf, &n_read) <= 0) {
-                        // presumable empty line, consume the newline
-                        if (scanf("%*c") <= 0) { /*ignore*/ }
-                        n_read=0;
-                    }
-                    if(params.use_color) printf(ANSI_COLOR_RESET);
-
-                    if (n_read > 0 && buf[n_read-1]=='\\') {
-                        another_line = true;
-                        buf[n_read-1] = '\n';
-                        buf[n_read] = 0;
-                    } else {
-                        another_line = false;
-                        buf[n_read] = '\n';
-                        buf[n_read+1] = 0;
-                    }
-
-                    std::vector<gpt_vocab::id> line_inp = ::llama_tokenize(vocab, buf, false);
-                    embd_inp.insert(embd_inp.end(), line_inp.begin(), line_inp.end());
-                    embd_inp.insert(embd_inp.end(), response_inp.begin(), response_inp.end());
-
-                    remaining_tokens -= prompt_inp.size() + line_inp.size() + response_inp.size();
-
-                    input_noecho = true; // do not echo this again
-                }
-
-                is_interacting = false;
-            }
+          process_interactive_mode(vocab,params,embd_inp,input_consumed,remaining_tokens);
         }
 
         // end of text token
