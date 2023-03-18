@@ -817,12 +817,26 @@ gpt_params initialize_params(int argc, char ** argv) {
     return params;
 }
 
+gpt_vocab::id predict_next_token(llama_model& model, gpt_vocab& vocab, std::vector<float>& logits, std::vector<gpt_vocab::id>& last_n_tokens, gpt_params& params, std::mt19937& rng) {
+    const float top_k = params.top_k;
+    const float top_p = params.top_p;
+    const float temp  = params.temp;
+    const float repeat_penalty = params.repeat_penalty;
+
+    const int n_vocab = model.hparams.n_vocab;
+
+    return llama_sample_top_p_top_k(vocab, logits.data() + (logits.size() - n_vocab), last_n_tokens, repeat_penalty, top_k, top_p, temp, rng);
+}
+
+
 
 int main(int argc, char ** argv) {
     ggml_time_init();
     const int64_t t_main_start_us = ggml_time_us();
 
     gpt_params params = initialize_params(argc,argv);
+
+
     std::mt19937 rng(params.seed);
 
 
@@ -965,24 +979,12 @@ int main(int argc, char ** argv) {
         embd.clear();
 
         if (embd_inp.size() <= input_consumed && !is_interacting) {
-            // out of user input, sample next token
-            const float top_k = params.top_k;
-            const float top_p = params.top_p;
-            const float temp  = params.temp;
-            const float repeat_penalty = params.repeat_penalty;
-
-            const int n_vocab = model.hparams.n_vocab;
 
             gpt_vocab::id id = 0;
 
             {
                 const int64_t t_start_sample_us = ggml_time_us();
-
-                id = llama_sample_top_p_top_k(vocab, logits.data() + (logits.size() - n_vocab), last_n_tokens, repeat_penalty, top_k, top_p, temp, rng);
-
-                last_n_tokens.erase(last_n_tokens.begin());
-                last_n_tokens.push_back(id);
-
+                id = predict_next_token(model,vocab,logits,last_n_tokens,params,rng);
                 t_sample_us += ggml_time_us() - t_start_sample_us;
             }
 
