@@ -828,7 +828,7 @@ gpt_vocab::id predict_next_token(llama_model& model, gpt_vocab& vocab, std::vect
     return llama_sample_top_p_top_k(vocab, logits.data() + (logits.size() - n_vocab), last_n_tokens, repeat_penalty, top_k, top_p, temp, rng);
 }
 
-
+const std::string INSTRUCTION_STRING = " Below is an instruction that describes a task. Write a response that appropriately completes the request.\n\n";
 
 int main(int argc, char ** argv) {
     ggml_time_init();
@@ -875,20 +875,9 @@ int main(int argc, char ** argv) {
     // tokenize the prompt
     std::vector<gpt_vocab::id> embd_inp;// = ::llama_tokenize(vocab, params.prompt, true);
 
-    // params.n_predict = std::min(params.n_predict, model.hparams.n_ctx - (int) embd_inp.size());
 
-    // // tokenize the reverse prompt
-    // std::vector<gpt_vocab::id> antiprompt_inp = ::llama_tokenize(vocab, params.antiprompt, false);
 
-    // fprintf(stderr, "\n");
-    // fprintf(stderr, "%s: prompt: '%s'\n", __func__, params.prompt.c_str());
-    // fprintf(stderr, "%s: number of tokens in prompt = %zu\n", __func__, embd_inp.size());
-    // for (int i = 0; i < (int) embd_inp.size(); i++) {
-    //     fprintf(stderr, "%6d -> '%s'\n", embd_inp[i], vocab.id_to_token.at(embd_inp[i]).c_str());
-    // }
-    // fprintf(stderr, "\n");
-
-    std::vector<gpt_vocab::id> instruct_inp = ::llama_tokenize(vocab, " Below is an instruction that describes a task. Write a response that appropriately completes the request.\n\n", true);
+    std::vector<gpt_vocab::id> instruct_inp = ::llama_tokenize(vocab,INSTRUCTION_STRING, true);
     std::vector<gpt_vocab::id> prompt_inp = ::llama_tokenize(vocab, "### Instruction:\n\n", true);
     std::vector<gpt_vocab::id> response_inp = ::llama_tokenize(vocab, "### Response:\n\n", false);
 
@@ -913,14 +902,6 @@ int main(int argc, char ** argv) {
 
         fprintf(stderr, "%s: interactive mode on.\n", __func__);
 
-        // if(antiprompt_inp.size()) {
-        //     fprintf(stderr, "%s: reverse prompt: '%s'\n", __func__, params.antiprompt.c_str());
-        //     fprintf(stderr, "%s: number of tokens in reverse prompt = %zu\n", __func__, antiprompt_inp.size());
-        //     for (int i = 0; i < (int) antiprompt_inp.size(); i++) {
-        //         fprintf(stderr, "%6d -> '%s'\n", antiprompt_inp[i], vocab.id_to_token.at(antiprompt_inp[i]).c_str());
-        //     }
-        //     fprintf(stderr, "\n");
-        // }
     }
     fprintf(stderr, "sampling parameters: temp = %f, top_k = %d, top_p = %f, repeat_last_n = %i, repeat_penalty = %f\n", params.temp, params.top_k, params.top_p, params.repeat_last_n, params.repeat_penalty);
     fprintf(stderr, "\n\n");
